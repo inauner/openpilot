@@ -1,3 +1,10 @@
+## ProMaster development
+
+Start with the [tester handoff and preflight instructions](docs/PROMASTER_TESTER.md).
+ProMaster development now lives in this repository, with the tester guide and
+merged lateral diagnostics and safety changes pinned in opendbc.
+It is not a validated vehicle release or a ready-to-install device image.
+
 <div align="center" style="text-align: center;">
 
 <h1>openpilot</h1>
