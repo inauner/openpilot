@@ -2,16 +2,29 @@
 
 ## Start here
 
-We need to identify the first point where openpilot's steering path differs
-from factory LKAS. This is development software; lateral control has not yet
-been demonstrated with this build. The first handoff is setup information and
-logs, not a request to try an unverified build on public roads.
+The earlier tested build demonstrated steering, then faulted after an
+uninterrupted 8.868918-second request. Both full rlogs (segments 0 and 1) of
+`06dc1eb54e298062/00000005--2c0b456823` were examined. This candidate limits
+requests to 3.5 seconds and requires at least 2 seconds inactive with continuous
+fault-free EPS standby before another handshake. Its reset behavior has not
+yet been vehicle-validated. Do not repeat the existing 8.8-second faulting build.
 
-The integration branch is `inauner/openpilot:master`.
-It pins opendbc to `26cfc43c0b197a99f61106dfef6fafd2461179a5`, including
-[opendbc PR #1](https://github.com/inauner/opendbc/pull/1).
+The integration base is `inauner/openpilot:master`; the test candidate branch
+is `inauner/openpilot:promaster-request-duration`.
+This candidate pins opendbc to `f989636a7b9b27038c1c0faa41d07620b6b86fde`,
+[opendbc PR #3](https://github.com/inauner/opendbc/pull/3), based on PR #1.
 The pin matters: updating only the outer repository or only Python files
 does not establish that the corresponding panda safety firmware is running.
+
+The primary torque cap is reduced from 300 to ±34 and secondary from 1,200
+to ±136; driver/rate limits, matched-message safety, counter synchronization,
+checksums, and EPS acknowledgment remain enforced. There is **no steering
+assist during reset**. The high-level openpilot engagement may remain active
+while actual steering requests and factory HUD state are inactive. If left
+engaged, another handshake may begin after the reset requirements are met.
+This is a short-engagement development candidate, not validated continuous
+lane centering. See the
+[evidence and limitations](https://github.com/inauner/opendbc/blob/f989636a7b9b27038c1c0faa41d07620b6b86fde/docs/promaster-request-duration.md).
 
 Development now lives in `inauner/openpilot`, continuing the history at
 `ab2666b3918ca664b8b3db7fe5a270e31ca208dc` with the updated opendbc pin and
@@ -127,6 +140,20 @@ handoff.
 
 ## 4. Capture evidence in stages
 
+**Next actuation test: short 3–4 second engagements first.** Prefer manual
+cancellation at 3 seconds. At 3.5 seconds the candidate withdraws steering
+requests even if still engaged; cancel before any automatic re-request.
+Before extending the test, inspect full rlogs for paired inactive/zero torque,
+continuous valid counters/checksums, and EPS returning cleanly from status 2
+to 0 with LKA_FAULT remaining zero. On the next separate short engagement,
+verify a new EPS acknowledgment before nonzero torque. Retain the intervening
+inactive logs to measure the actual reset interval and standby behavior.
+
+Stop on any EPS fault, oscillation, or unexpected steering. Save full logs and
+EPS diagnostic codes if available; do not repeat the faulting run or increase
+torque. A duration watchdog is the leading hypothesis, not a proven diagnosis:
+oscillating torque and driver opposition remain plausible contributors.
+
 **Existing logs first.** Send any route from a previous experimental
 engagement, even if it only shows refusal to engage. Include the complete
 route and the relevant segment numbers/time offsets. That may answer the
@@ -203,7 +230,19 @@ Background: [comma's port structure](https://docs.comma.ai/how-to/car-port/)
 and [safety requirements](https://docs.comma.ai/SAFETY/). The targeted tests
 passed; that alone does not validate the complete port or physical steering.
 
-## Validation status for this handoff
+## Validation status for this candidate
+
+- Current targeted controller/safety/CAN checksum suites: 74 passed, 4 skipped,
+  389 subtests passed, using locally compiled libsafety and the repository SCons
+  build. Ruff and diff checks passed.
+- New coverage includes exact deadline boundaries, complete/reset-interrupted
+  standby, quick re-engagement, faults, stale and fresh acknowledgment, multiple
+  cycles, both command checksums/counters, lower torque caps, and an 1,800-frame
+  controller-to-safety sequence.
+- No complete device build, panda flash, hardware-in-loop test, or physical
+  validation of the 3.5/2-second protocol has been performed.
+
+### Historical PR #1 validation
 
 - Targeted ProMaster/controller/CAN checksum run: 66 passed, 4 skipped,
   389 subtests passed.
