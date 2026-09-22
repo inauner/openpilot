@@ -3,6 +3,9 @@
 Start with the [tester handoff and preflight instructions](docs/PROMASTER_TESTER.md).
 ProMaster development now lives in this repository, with the tester guide and
 merged lateral diagnostics and safety changes pinned in opendbc.
+Use `master`, `pm`, or `promaster`: all three point to the same tester revision.
+The guide identifies the exact belm0 build demonstrated in the route logs and
+includes complete source preparation, verification, and short-engagement criteria.
 It is not a validated vehicle release or a ready-to-install device image.
 
 <div align="center" style="text-align: center;">

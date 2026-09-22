@@ -9,8 +9,8 @@ requests to 3.5 seconds and requires at least 2 seconds inactive with continuous
 fault-free EPS standby before another handshake. Its reset behavior has not
 yet been vehicle-validated. Do not repeat the existing 8.8-second faulting build.
 
-The integration base is `inauner/openpilot:master`; the test candidate branch
-is `inauner/openpilot:promaster-request-duration`.
+Use `inauner/openpilot:master`. The `pm` and `promaster` branches are synchronized
+aliases of the same tester revision; all three contain the same source and pin.
 This candidate pins opendbc to `f989636a7b9b27038c1c0faa41d07620b6b86fde`,
 [opendbc PR #3](https://github.com/inauner/opendbc/pull/3), based on PR #1.
 The pin matters: updating only the outer repository or only Python files
@@ -30,6 +30,26 @@ Development now lives in `inauner/openpilot`, continuing the history at
 `ab2666b3918ca664b8b3db7fe5a270e31ca208dc` with the updated opendbc pin and
 this tester handoff. The temporary `inauner/promaster-dev` repository is
 archived; use this repository for subsequent work.
+
+### The recorded working baseline
+
+The full rlogs identify openpilot `158241f5ac597ab74a57d4bc2f477f3eb0c19020`
+and its opendbc gitlink `33d3ccec57446387a666599ca0094c39e08067e0`, from
+[belm0's ProMaster test development](https://github.com/belm0/openpilot/commit/158241f5ac597ab74a57d4bc2f477f3eb0c19020).
+That build demonstrated steering authority before the EPS fault. The name
+`belm0/openpilot:promaster_test1` is movable: when checked on September 22,
+its tip was `0fc08c699325677953c29fe4d4fc2873e41bcadb`, pinning a later
+opendbc experiment `6676a00c396804d222f19ad06e0e31708f160ea8`. Do not use
+that branch's current tip as a substitute for the recorded baseline.
+
+Our outer openpilot runtime, model asset pointers, AGNOS 17.2 target, and all
+submodule pins other than opendbc match the recorded build. Five malformed
+symlinks introduced during the fork migration have been restored byte-for-byte
+from that commit, fixing the spurious missing-LFS-object downloads. The opendbc
+changes are the documented paired-message/driver-override fixes and conservative
+request/reset and torque-limit changes; their acknowledgment/steering encoding
+is based on the demonstrated path. This establishes a demonstrated starting
+point, not vehicle validation of the new reset behavior.
 
 ## 1. Send this information before changing the installed software
 
@@ -88,7 +108,7 @@ git rev-parse HEAD
 git -C opendbc_repo rev-parse HEAD
 ```
 
-The last command must print `26cfc43c0b197a99f61106dfef6fafd2461179a5`.
+The last command must print `f989636a7b9b27038c1c0faa41d07620b6b86fde`.
 LFS assets and other submodules are deliberately not downloaded in this
 preflight checkout. Do not run its launcher or point `/data/continue.sh` at it.
 
@@ -107,6 +127,40 @@ account tokens, Git remote URLs, and keys. It does not contact panda or write
 parameters. Saved CarParams can be stale; we confirm the actual vehicle and
 safety configuration from a fresh route.
 
+### Complete source and build preparation
+
+To complete that staged checkout on Linux/AGNOS, use these commands from
+`/data/promaster-lateral-test1` while offroad. They obtain the committed
+dependencies and verify source completeness; they do not switch the active
+installation or launch steering control. Git LFS must be installed.
+
+```sh
+git submodule sync --recursive
+git submodule update --init --recursive --jobs 4
+git lfs pull
+git lfs fsck
+python3 tools/promaster/verify_source.py
+```
+
+Require `source_complete: true` and no errors. The verifier checks the exact
+opendbc pin, recursive submodule revisions, clean checkout, downloaded LFS
+files, and the tested model/library symlinks. Stop on a failed command and
+preserve its output; do not substitute branches or skip assets to continue.
+
+On an AGNOS 17.2 device with the developer-confirmed setup, the repository's
+standard dependency and build entry points are:
+
+```sh
+./tools/op.sh setup
+./tools/op.sh build
+```
+
+These install dependencies and compile code. The build command selects the
+device build process on AGNOS. Source verification is not a complete device
+build or proof that the matching panda firmware is running. Keep the previous
+installation and its exact commit available for rollback; switching the active
+checkout/startup path remains a device-specific step after build/startup review.
+
 ## 3. Installation gate: return the preflight first
 
 This source tree's `launch_env.sh` targets **AGNOS 17.2**. Its launcher can
@@ -118,8 +172,9 @@ or treat this staging procedure as an installation recipe.
 After preflight review, the developer will provide an exact outer commit,
 compatible OS/build procedure, installation and rollback steps for your
 device. Preserve the previous working software and logs before that step.
-This handoff provides source-staging instructions only; a bootable tester
-image and installation procedure have not yet been validated.
+This handoff provides staging, source verification and build preparation;
+a bootable tester image and device-specific installation/rollback procedure
+have not yet been validated.
 
 The developer must verify that:
 
