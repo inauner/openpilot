@@ -1,18 +1,49 @@
 # ProMaster lateral development — tester handoff
 
-## Start here
+## September 24 gradual-cutoff candidate
+
+Installer branch: `installer.comma.ai/inauner/master`. Record the installed
+outer commit and opendbc pin below before testing; do not reuse 60c3b50.
+
+The previous build's timer ran in both recorded cases: one clean cutoff after
+zero torque, and one EPS fault after an abrupt 11-to-zero primary torque drop.
+This candidate tests gradual withdrawal; it does not establish the EPS fault cause.
+
+- At 3.0 seconds of request, reduce primary torque toward zero by 2 units per
+  normal 10 ms update, ignoring renewed/reversed demand during shutdown.
+- From 3.2 seconds, hold zero torque with the request still active.
+- At 3.5 seconds, drop both requests. Keep the existing clean reset and fresh
+  EPS acknowledgment requirements. Manual cancellation and faults stop immediately.
+
+**First test: one automatic cutoff only.** On a controlled course, be ready to
+steer as assistance fades around 3 seconds. Allow the timed cutoff, then cancel
+by about 4 seconds after engagement, before automatic restart can occur. Stop
+on any fault or unexpected steering. Upload full rlogs for all relevant segments.
+We must verify the gradual reduction, zero hold, accepted paired commands and
+fault-free EPS status 0 before moving to the next stage.
+
+**After log review: one automatic restart.** Allow one complete inactive/reset
+interval and fresh acknowledgment, then cancel after torque returns. Review that
+log before testing multiple cycles. There is no assistance during reset, and
+high-level engagement can remain active. This is not uninterrupted steering.
+
+Local validation: 77 tests passed, 4 skipped, 389 subtests passed (controller,
+compiled panda safety and checksums); Ruff passed. The new withdrawal behavior
+has not been vehicle-tested or built/flashed on Jeremy's device here.
+
+## Background and setup
 
 The earlier tested build demonstrated steering, then faulted after an
 uninterrupted 8.868918-second request. Both full rlogs (segments 0 and 1) of
 `06dc1eb54e298062/00000005--2c0b456823` were examined. This candidate limits
 requests to 3.5 seconds and requires at least 2 seconds inactive with continuous
-fault-free EPS standby before another handshake. Its reset behavior has not
-yet been vehicle-validated. Do not repeat the existing 8.8-second faulting build.
+fault-free EPS standby before another handshake. The prior build had one clean automatic cutoff and one faulting cutoff;
+the revised gradual withdrawal has not yet been vehicle-validated. Do not repeat the existing 8.8-second faulting build.
 
 Use `inauner/openpilot:master`. The `pm` and `promaster` branches are synchronized
 aliases of the same tester revision; all three contain the same source and pin.
-This candidate pins opendbc to `f989636a7b9b27038c1c0faa41d07620b6b86fde`,
-[opendbc PR #3](https://github.com/inauner/opendbc/pull/3), based on PR #1.
+This candidate pins opendbc to `efccfcad62cc8ae39c549b5f247f19eaa22976fa`,
+[opendbc PR #4](https://github.com/inauner/opendbc/pull/4), based on PR #1.
 The pin matters: updating only the outer repository or only Python files
 does not establish that the corresponding panda safety firmware is running.
 
@@ -24,7 +55,7 @@ while actual steering requests and factory HUD state are inactive. If left
 engaged, another handshake may begin after the reset requirements are met.
 This is a short-engagement development candidate, not validated continuous
 lane centering. See the
-[evidence and limitations](https://github.com/inauner/opendbc/blob/f989636a7b9b27038c1c0faa41d07620b6b86fde/docs/promaster-request-duration.md).
+[evidence and limitations](https://github.com/inauner/opendbc/blob/efccfcad62cc8ae39c549b5f247f19eaa22976fa/docs/promaster-request-duration.md).
 
 Development now lives in `inauner/openpilot`, continuing the history at
 `ab2666b3918ca664b8b3db7fe5a270e31ca208dc` with the updated opendbc pin and
@@ -108,7 +139,7 @@ git rev-parse HEAD
 git -C opendbc_repo rev-parse HEAD
 ```
 
-The last command must print `f989636a7b9b27038c1c0faa41d07620b6b86fde`.
+The last command must print `efccfcad62cc8ae39c549b5f247f19eaa22976fa`.
 LFS assets and other submodules are deliberately not downloaded in this
 preflight checkout. Do not run its launcher or point `/data/continue.sh` at it.
 
@@ -287,7 +318,7 @@ passed; that alone does not validate the complete port or physical steering.
 
 ## Validation status for this candidate
 
-- Current targeted controller/safety/CAN checksum suites: 74 passed, 4 skipped,
+- Current targeted controller/safety/CAN checksum suites: 77 passed, 4 skipped,
   389 subtests passed, using locally compiled libsafety and the repository SCons
   build. Ruff and diff checks passed.
 - New coverage includes exact deadline boundaries, complete/reset-interrupted
