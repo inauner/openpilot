@@ -8,7 +8,7 @@ import json
 import subprocess
 from pathlib import Path
 
-EXPECTED_OPENDBC = 'f989636a7b9b27038c1c0faa41d07620b6b86fde'
+EXPECTED_OPENDBC = 'efccfcad62cc8ae39c549b5f247f19eaa22976fa'
 LINKS = {
   'selfdrive/modeld/models/big_driving_policy.onnx': 'driving_policy.onnx',
   'selfdrive/modeld/models/big_driving_vision.onnx': 'driving_vision.onnx',
