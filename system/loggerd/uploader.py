@@ -226,6 +226,58 @@ class Uploader:
     return self.upload(name, key, fn, network_type, metered)
 
 
+def upload_route_now(route: str | None = None) -> tuple[bool, str]:
+  """Upload a completed route (all its files, including rlog) to comma connect.
+
+  Used by the on-device "Upload Now" control. Defaults to the most recent
+  completed route (one without a .lock file). Returns (ok, message).
+  """
+  params = Params()
+  dongle_id = params.get("DongleId")
+  if dongle_id is None:
+    return False, "no dongle id"
+
+  root = Paths.log_root()
+
+  if route is None:
+    for candidate in reversed(listdir_by_creation(root)):
+      candidate_path = os.path.join(root, candidate)
+      try:
+        names = os.listdir(candidate_path)
+      except OSError:
+        continue
+      if any(name.endswith(".lock") for name in names):
+        continue  # route still being written
+      route = candidate
+      break
+
+  if route is None:
+    return False, "no completed routes"
+
+  path = os.path.join(root, route)
+  uploader = Uploader(dongle_id, root)
+
+  uploaded = 0
+  for name in sorted(os.listdir(path), key=lambda n: uploader.immediate_priority.get(n, 1000)):
+    fn = os.path.join(path, name)
+    if not os.path.isfile(fn) or name.endswith(".lock"):
+      continue
+    try:
+      if getxattr(fn, UPLOAD_ATTR_NAME) == UPLOAD_ATTR_VALUE:
+        continue
+    except OSError:
+      continue
+
+    key = os.path.join(route, name)
+    if key.endswith(("qlog", "rlog")) or (key.startswith("boot/") and not key.endswith(".zst")):
+      key += ".zst"
+
+    if uploader.upload(name, key, fn, NetworkType.wifi, False):
+      uploaded += 1
+
+  return True, f"uploaded {uploaded} file(s) from {route}"
+
+
 def main(exit_event: threading.Event | None = None) -> None:
   if exit_event is None:
     exit_event = threading.Event()

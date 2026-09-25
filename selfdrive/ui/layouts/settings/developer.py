@@ -1,8 +1,11 @@
+import threading
+
 from openpilot.common.params import Params
+from openpilot.common.swaglog import cloudlog
 from openpilot.selfdrive.ui.widgets.ssh_key import ssh_key_item
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.widgets import Widget
-from openpilot.system.ui.widgets.list_view import multiple_button_item, toggle_item
+from openpilot.system.ui.widgets.list_view import button_item, multiple_button_item, toggle_item
 from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.widgets.confirm_dialog import ConfirmDialog
 from openpilot.system.ui.lib.application import gui_app
@@ -29,6 +32,10 @@ DESCRIPTIONS = {
     "Bench-testing aid. Overrides the ignition-based onroad/offroad state: <b>Onroad</b> starts the driving " +
     "stack without ignition, <b>Offroad</b> parks the device, and <b>Auto</b> follows ignition. " +
     "The override clears on reboot."
+  ),
+  'upload_now': tr_noop(
+    "Upload the most recently completed drive route to comma connect now, including full-resolution logs. " +
+    "Requires a network connection."
   ),
 }
 
@@ -97,6 +104,16 @@ class DeveloperLayout(Widget):
       selected_index=self._force_drive_state_index(),
     )
 
+    self._uploading = False
+    self._upload_status = ""
+    self._upload_now_btn = button_item(
+      lambda: tr("Upload Latest Route"),
+      lambda: tr("UPLOAD"),
+      description=lambda: tr(self._upload_status) if self._upload_status else tr(DESCRIPTIONS["upload_now"]),
+      callback=self._on_upload_now,
+      enabled=lambda: not self._uploading,
+    )
+
     self._scroller = Scroller([
       self._adb_toggle,
       self._ssh_toggle,
@@ -106,6 +123,7 @@ class DeveloperLayout(Widget):
       self._alpha_long_toggle,
       self._ui_debug_toggle,
       self._force_drive_state,
+      self._upload_now_btn,
     ], line_separator=True, spacing=0)
 
     # Toggles should be not available to change in onroad state
@@ -169,6 +187,23 @@ class DeveloperLayout(Widget):
   def _set_force_drive_state(self, index: int):
     self._params.put_bool("ForceOnroad", index == 1)
     self._params.put_bool("ForceOffroad", index == 2)
+
+  def _on_upload_now(self):
+    if self._uploading:
+      return
+    self._uploading = True
+    self._upload_status = tr("Uploading latest route...")
+    threading.Thread(target=self._run_upload, daemon=True).start()
+
+  def _run_upload(self):
+    try:
+      from openpilot.system.loggerd.uploader import upload_route_now
+      _, msg = upload_route_now()
+    except Exception:
+      cloudlog.exception("upload_route_now failed")
+      msg = tr("upload failed")
+    self._upload_status = msg
+    self._uploading = False
 
   def _on_enable_ui_debug(self, state: bool):
     self._params.put_bool("ShowDebugInfo", state)
