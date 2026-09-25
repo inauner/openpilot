@@ -17,6 +17,7 @@ FONT_SIZE = 35
 
 SETTINGS_BTN = rl.Rectangle(50, 35, 200, 117)
 HOME_BTN = rl.Rectangle(60, 860, 180, 180)
+FORCE_DRIVE_BTN = rl.Rectangle(50, 788, 200, 62)
 
 ThermalStatus = log.DeviceState.ThermalStatus
 NetworkType = log.DeviceState.NetworkType
@@ -37,6 +38,10 @@ class Colors:
   METRIC_BORDER = rl.Color(255, 255, 255, 85)
   BUTTON_NORMAL = rl.WHITE
   BUTTON_PRESSED = rl.Color(255, 255, 255, 166)
+
+  # Force drive toggle
+  ONROAD = rl.Color(20, 200, 130, 255)
+  OFFROAD = rl.Color(219, 56, 34, 255)
 
 
 NETWORK_TYPES = {
@@ -150,9 +155,21 @@ class Sidebar(Widget):
     elif rl.check_collision_point_rec(mouse_pos, HOME_BTN) and ui_state.started:
       if self._on_flag_click:
         self._on_flag_click()
+    elif rl.check_collision_point_rec(mouse_pos, FORCE_DRIVE_BTN):
+      self._toggle_force_drive()
     elif self._recording_audio and rl.check_collision_point_rec(mouse_pos, self._mic_indicator_rect):
       if self._open_settings_callback:
         self._open_settings_callback()
+
+  def _toggle_force_drive(self):
+    # Bench-test aid: start/stop a recorded drive without ignition so routes can be uploaded.
+    params = ui_state.params
+    if params.get_bool("ForceOnroad"):
+      params.put_bool("ForceOnroad", False)
+      params.put_bool("ForceOffroad", True)
+    else:
+      params.put_bool("ForceOffroad", False)
+      params.put_bool("ForceOnroad", True)
 
   def _draw_buttons(self, rect: rl.Rectangle):
     mouse_pos = rl.get_mouse_position()
@@ -169,6 +186,21 @@ class Sidebar(Widget):
 
     tint = Colors.BUTTON_PRESSED if (ui_state.started and flag_pressed) else Colors.BUTTON_NORMAL
     rl.draw_texture(button_img, int(HOME_BTN.x), int(HOME_BTN.y), tint)
+
+    # Force drive toggle
+    force_onroad = ui_state.params.get_bool("ForceOnroad")
+    force_down = mouse_down and rl.check_collision_point_rec(mouse_pos, FORCE_DRIVE_BTN)
+    base_color = Colors.OFFROAD if force_onroad else Colors.ONROAD
+    fill = rl.Color(base_color.r, base_color.g, base_color.b, 166 if force_down else 255)
+    rl.draw_rectangle_rounded(FORCE_DRIVE_BTN, 0.3, 10, fill)
+
+    label = tr("OFFROAD") if force_onroad else tr("ONROAD")
+    text_size = measure_text_cached(self._font_bold, label, FONT_SIZE)
+    text_pos = rl.Vector2(
+      FORCE_DRIVE_BTN.x + (FORCE_DRIVE_BTN.width - text_size.x) / 2,
+      FORCE_DRIVE_BTN.y + (FORCE_DRIVE_BTN.height - text_size.y) / 2,
+    )
+    rl.draw_text_ex(self._font_bold, label, text_pos, FONT_SIZE, 0, Colors.WHITE)
 
     # Microphone button
     if self._recording_audio:

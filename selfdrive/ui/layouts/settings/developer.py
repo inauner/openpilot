@@ -2,7 +2,7 @@ from openpilot.common.params import Params
 from openpilot.selfdrive.ui.widgets.ssh_key import ssh_key_item
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.widgets import Widget
-from openpilot.system.ui.widgets.list_view import toggle_item
+from openpilot.system.ui.widgets.list_view import multiple_button_item, toggle_item
 from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.widgets.confirm_dialog import ConfirmDialog
 from openpilot.system.ui.lib.application import gui_app
@@ -24,6 +24,11 @@ DESCRIPTIONS = {
     "On this car, openpilot defaults to the car's built-in ACC instead of openpilot's longitudinal control. " +
     "Enable this to switch to openpilot longitudinal control. Enabling Experimental mode is recommended when enabling openpilot longitudinal control alpha. " +
     "Changing this setting will restart openpilot if the car is powered on."
+  ),
+  'force_drive_state': tr_noop(
+    "Bench-testing aid. Overrides the ignition-based onroad/offroad state: <b>Onroad</b> starts the driving " +
+    "stack without ignition, <b>Offroad</b> parks the device, and <b>Auto</b> follows ignition. " +
+    "The override clears on reboot."
   ),
 }
 
@@ -83,6 +88,15 @@ class DeveloperLayout(Widget):
     )
     self._on_enable_ui_debug(self._params.get_bool("ShowDebugInfo"))
 
+    self._force_drive_state = multiple_button_item(
+      lambda: tr("Force Drive State"),
+      lambda: tr(DESCRIPTIONS["force_drive_state"]),
+      buttons=[lambda: tr("Auto"), lambda: tr("Onroad"), lambda: tr("Offroad")],
+      button_width=200,
+      callback=self._set_force_drive_state,
+      selected_index=self._force_drive_state_index(),
+    )
+
     self._scroller = Scroller([
       self._adb_toggle,
       self._ssh_toggle,
@@ -91,6 +105,7 @@ class DeveloperLayout(Widget):
       self._long_maneuver_toggle,
       self._alpha_long_toggle,
       self._ui_debug_toggle,
+      self._force_drive_state,
     ], line_separator=True, spacing=0)
 
     # Toggles should be not available to change in onroad state
@@ -141,6 +156,19 @@ class DeveloperLayout(Widget):
       ("ShowDebugInfo", self._ui_debug_toggle),
     ):
       item.action_item.set_state(self._params.get_bool(key))
+
+    self._force_drive_state.action_item.set_selected_button(self._force_drive_state_index())
+
+  def _force_drive_state_index(self) -> int:
+    if self._params.get_bool("ForceOnroad"):
+      return 1
+    if self._params.get_bool("ForceOffroad"):
+      return 2
+    return 0
+
+  def _set_force_drive_state(self, index: int):
+    self._params.put_bool("ForceOnroad", index == 1)
+    self._params.put_bool("ForceOffroad", index == 2)
 
   def _on_enable_ui_debug(self, state: bool):
     self._params.put_bool("ShowDebugInfo", state)

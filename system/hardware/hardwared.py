@@ -334,6 +334,10 @@ def hardware_thread(end_event, hw_queue) -> None:
     if started_ts is None:
       should_start = should_start and all(startup_conditions.values())
 
+    # Manual override for bench testing. ForceOffroad wins over ForceOnroad.
+    should_start |= params.get_bool("ForceOnroad")
+    should_start &= not params.get_bool("ForceOffroad")
+
     if should_start != should_start_prev or (count == 0):
       params.put_bool("IsEngaged", False)
       engaged_prev = False
